@@ -12,13 +12,13 @@ provider "aws" {
     region = "us-east-1"
 }
 
-#need to find the basic queue id of each instance after deployed to configure routing profile for this demo
+#Before deployment comment out aws_connect_routing_profile and aws_connect_user if you using Terraform v1.5.7
+
+#To find the basic queue id of each instance after deployed needed to configure routing profile 
 #comment out 
-# -routing profile until the basic instance is deployed
-# Then run:
 #  aws connect list-instances (get instance id from cli output)
 # then run
-# aws connect list-queues --instance-id
+# aws connect list-queues --instance-id a2bfeb88-7bd7-484e-9684-26d420ab3b4c
 # get the ID of the basic queue and place appropriately for inside routing profile 
 # update queue id in 2 places for queue: queue-id and defaut queue
 
@@ -26,11 +26,11 @@ provider "aws" {
 resource "aws_connect_instance" "thecloudshepherd_youtube" {
   identity_management_type = "CONNECT_MANAGED"
   inbound_calls_enabled    = true
-  instance_alias           = "thecloudshepherdyoutube1"
+  instance_alias           = "thecloudshepherdlinkedin"
   outbound_calls_enabled   = true
 }
 
-# reached limit service quotoa
+# reached limit service quota will have another demo where I set this up =)
 
 # resource "aws_connect_phone_number" "thecloudshepherd" {
 #   target_arn   = aws_connect_instance.thecloudshepherd_youtube.arn
@@ -78,12 +78,12 @@ resource "aws_connect_hours_of_operation" "business_hours" {
 # aws connect list-instances
 # aws connect list-queues --instance-id 14dcff5c-ef79-4c25-8f59-1039d56141da
 
-# routing profile 
+# # routing profile 
 
 resource "aws_connect_routing_profile" "routing_profile" {
   instance_id               = aws_connect_instance.thecloudshepherd_youtube.id
   name                      = "routing_queue_youtube"
-  default_outbound_queue_id = "52ec8766-efa0-4e5f-a778-87eeafc0823c"
+  default_outbound_queue_id = "6304de78-99b0-4af6-854f-7998c8216969"
   description               = "Youtube Routing Profile"
 media_concurrencies {
     channel     = "VOICE"
@@ -93,10 +93,33 @@ queue_configs {
     channel  = "VOICE"
     delay    = 0
     priority = 1
-    queue_id = "52ec8766-efa0-4e5f-a778-87eeafc0823c"
+    queue_id = "6304de78-99b0-4af6-854f-7998c8216969"
   }
 tags = {
     "Name" = "Routing Profile Demo Youtbue"
+  }
+}
+
+
+
+resource "aws_connect_user" "thecloudshepherd_youtube" {
+  instance_id        = aws_connect_instance.thecloudshepherd_youtube.id
+  name               = "Thecl0udshepherd_youtube_3"
+  password           = "Thecl0udshepherd_youtube_3"
+  routing_profile_id = aws_connect_routing_profile.routing_profile.routing_profile_id
+
+  security_profile_ids = [
+    aws_connect_security_profile.admin_security_profile.security_profile_id
+  ]
+
+  identity_info {
+    first_name = "Elliot"
+    last_name  = "AD"
+  }
+
+  phone_config {
+    after_contact_work_time_limit = 0
+    phone_type                    = "SOFT_PHONE"
   }
 }
 
@@ -106,7 +129,7 @@ resource "aws_connect_security_profile" "admin_security_profile" {
   name        = "Admin security profile"
   description = "Admin security profile"
     permissions = [
-           
+          "Users.Create",
     "BasicAgentAccess",
     "OutboundCallAccess",
    
@@ -117,28 +140,6 @@ tags = {
   }
 }
   
-
-resource "aws_connect_user" "thecloudshepherd_youtube" {
-  instance_id        = aws_connect_instance.thecloudshepherd_youtube.id
-  name               = "Thecl0udshepherd_youtube"
-  password           = "Thecl0udshepherd_youtube"
-  routing_profile_id = aws_connect_routing_profile.routing_profile.routing_profile_id
-
-  security_profile_ids = [
-    aws_connect_security_profile.admin_security_profile.security_profile_id
-  ]
-
-  identity_info {
-    first_name = "Elliott"
-    last_name  = "Arnold"
-  }
-
-  phone_config {
-    after_contact_work_time_limit = 0
-    phone_type                    = "SOFT_PHONE"
-  }
-}
-
 
 resource "aws_connect_contact_flow" "test" {
   instance_id = aws_connect_instance.thecloudshepherd_youtube.id
