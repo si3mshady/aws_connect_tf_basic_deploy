@@ -12,7 +12,7 @@ provider "aws" {
     region = "us-east-1"
 }
 
-# 3ba09dbe-eea6-4563-89a8-457b3fb0e510 is default basic queue
+#need to find the basic queue id of each instance after deployed to configure routing profile for this demo
 #comment out 
 # -routing profile until the basic instance is deployed
 # Then run:
