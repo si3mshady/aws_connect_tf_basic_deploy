@@ -1,28 +1,52 @@
 #Basic setup for AWS Connect
+terraform {
+    required_providers {
+       aws = {
+          source  = "hashicorp/aws"
+         
+     }
+   }
+ }
+
+provider "aws" {
+    region = "us-east-1"
+}
+
+# 3ba09dbe-eea6-4563-89a8-457b3fb0e510 is default basic queue
+#comment out 
+# -routing profile until the basic instance is deployed
+# Then run:
+#  aws connect list-instances (get instance id from cli output)
+# then run
+# aws connect list-queues --instance-id
+# get the ID of the basic queue and place appropriately for inside routing profile 
+# update queue id in 2 places for queue: queue-id and defaut queue
+
 
 resource "aws_connect_instance" "thecloudshepherd_youtube" {
   identity_management_type = "CONNECT_MANAGED"
   inbound_calls_enabled    = true
-  instance_alias           = "thecloudshepherdyoutube"
+  instance_alias           = "thecloudshepherdyoutube1"
   outbound_calls_enabled   = true
 }
 
+# reached limit service quotoa
 
-resource "aws_connect_phone_number" "thecloudshepherd" {
-  target_arn   = aws_connect_instance.thecloudshepherd_youtube.arn
-  depends_on = [ aws_connect_hours_of_operation.business_hours ]
-  country_code = "US"
-  type         = "DID"
-  tags = {
-    "number" = "US"
-  }
-}
+# resource "aws_connect_phone_number" "thecloudshepherd" {
+#   target_arn   = aws_connect_instance.thecloudshepherd_youtube.arn
+#   depends_on = [ aws_connect_hours_of_operation.business_hours ]
+#   country_code = "US"
+#   type         = "DID"
+#   tags = {
+#     "number" = "US"
+#   }
+# }
 
 resource "aws_connect_hours_of_operation" "business_hours" {
   instance_id = aws_connect_instance.thecloudshepherd_youtube.id
   name        = "Business Hours"
   description = "Open For Business"
-  time_zone   = "CENTRAL"
+  time_zone   = "EST"
   config {
     day = "MONDAY"
     end_time {
@@ -50,21 +74,16 @@ resource "aws_connect_hours_of_operation" "business_hours" {
   }
 }
 
-resource "aws_connect_queue" "first_contact_queue" {
-  instance_id           = aws_connect_instance.thecloudshepherd_youtube.id
-  name                  = "first_contact_queue"
-  description           = "first_contact_queue"
-  hours_of_operation_id = aws_connect_hours_of_operation.business_hours.id
-  tags = {
-    "Name" = "First contact queue",
-  }
+#use aws cli to get the default queue id - 
+# aws connect list-instances
+# aws connect list-queues --instance-id 14dcff5c-ef79-4c25-8f59-1039d56141da
 
-}
+# routing profile 
 
 resource "aws_connect_routing_profile" "routing_profile" {
   instance_id               = aws_connect_instance.thecloudshepherd_youtube.id
   name                      = "routing_queue_youtube"
-  default_outbound_queue_id = aws_connect_queue.first_contact_queue.id
+  default_outbound_queue_id = "52ec8766-efa0-4e5f-a778-87eeafc0823c"
   description               = "Youtube Routing Profile"
 media_concurrencies {
     channel     = "VOICE"
@@ -74,7 +93,7 @@ queue_configs {
     channel  = "VOICE"
     delay    = 0
     priority = 1
-    queue_id = aws_connect_queue.first_contact_queue.queue_id
+    queue_id = "52ec8766-efa0-4e5f-a778-87eeafc0823c"
   }
 tags = {
     "Name" = "Routing Profile Demo Youtbue"
@@ -90,21 +109,7 @@ resource "aws_connect_security_profile" "admin_security_profile" {
            
     "BasicAgentAccess",
     "OutboundCallAccess",
-    "CreateRoutingProfile",
-    "EditRoutingProfile",
-    "ViewRoutingProfile",
-    "CreateTransferDestination",
-    "ViewQueues",
-    "CreateTaskTemplate",
-    "DeleteTaskTemplate",
-    "EditTaskTemplate",
-    "ViewTaskTemplate",
-    "CreatePrompt",
-    "DeletePrompt",
-    "EditPrompt",
-    "ViewPrompt",
-    "DeleteUser",
-    "EditUser"
+   
 ]
         
 tags = {
@@ -115,8 +120,8 @@ tags = {
 
 resource "aws_connect_user" "thecloudshepherd_youtube" {
   instance_id        = aws_connect_instance.thecloudshepherd_youtube.id
-  name               = "thecloudshepherd_youtube"
-  password           = "thecloudshepherd_youtube"
+  name               = "Thecl0udshepherd_youtube"
+  password           = "Thecl0udshepherd_youtube"
   routing_profile_id = aws_connect_routing_profile.routing_profile.routing_profile_id
 
   security_profile_ids = [
@@ -135,131 +140,43 @@ resource "aws_connect_user" "thecloudshepherd_youtube" {
 }
 
 
+resource "aws_connect_contact_flow" "test" {
+  instance_id = aws_connect_instance.thecloudshepherd_youtube.id
+  name        = "Test"
+  description = "Test Contact Flow Description"
+  type        = "CONTACT_FLOW"
+  content = jsonencode({
+    Version     = "2019-10-30"
+    StartAction = "12345678-1234-1234-1234-123456789012"
+    Actions = [
+      {
+        Identifier = "12345678-1234-1234-1234-123456789012"
+        Type       = "MessageParticipant"
 
+        Transitions = {
+          NextAction = "abcdef-abcd-abcd-abcd-abcdefghijkl"
+          Errors     = []
+          Conditions = []
+        }
 
+        Parameters = {
+          Text = "Thanks for calling the sample flow!"
+        }
+      },
+      {
+        Identifier  = "abcdef-abcd-abcd-abcd-abcdefghijkl"
+        Type        = "DisconnectParticipant"
+        Transitions = {}
+        Parameters  = {}
+      }
+    ]
+  })
 
+  tags = {
+    "Name"        = "Test Contact Flow"
+    "Application" = "Terraform"
+    "Method"      = "Create"
+  }
+}
 
-
-
-# resource "aws_connect_contact_flow" "test" {
-#   instance_id = "aaaaaaaa-bbbb-cccc-dddd-111111111111"
-#   name        = "Test"
-#   description = "Test Contact Flow Description"
-#   type        = "CONTACT_FLOW"
-#   content = jsonencode({
-#     Version     = "2019-10-30"
-#     StartAction = "12345678-1234-1234-1234-123456789012"
-#     Actions = [
-#       {
-#         Identifier = "12345678-1234-1234-1234-123456789012"
-#         Type       = "MessageParticipant"
-
-#         Transitions = {
-#           NextAction = "abcdef-abcd-abcd-abcd-abcdefghijkl"
-#           Errors     = []
-#           Conditions = []
-#         }
-
-#         Parameters = {
-#           Text = "Thanks for calling the sample flow!"
-#         }
-#       },
-#       {
-#         Identifier  = "abcdef-abcd-abcd-abcd-abcdefghijkl"
-#         Type        = "DisconnectParticipant"
-#         Transitions = {}
-#         Parameters  = {}
-#       }
-#     ]
-#   })
-
-#   tags = {
-#     "Name"        = "Test Contact Flow"
-#     "Application" = "Terraform"
-#     "Method"      = "Create"
-#   }
-# }
-
-
-
-# resource "aws_lambda_function" "test_lambda" {
-#   function_name = "lambda_function_name"
-#   handler       = "index.handler"
-#   runtime       = "nodejs14.x"
-#   role          = aws_iam_role.iam_for_lambda.arn
-
-#   # Inline code
-#   inline_code = <<EOF
-#     exports.handler = async (event) => {
-#       const response = {
-#         statusCode: 200,
-#         body: "Hello, World!"
-#       };
-#       return response;
-#     };
-#     EOF
-# }
-
-# resource "aws_iam_role" "iam_for_lambda" {
-#   name = "iam_for_lambda"
-#   assume_role_policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = "sts:AssumeRole"
-#         Effect = "Allow"
-#         Principal = {
-#           Service = "lambda.amazonaws.com"
-#         }
-#       }
-#     ]
-#   })
-# }
-
-#######
-# Advanced 
-
-# resource "aws_connect_lambda_function_association" "lambda_assoc" {
-#   function_arn = var.lambda_function_arn
-#   instance_id  = aws_connect_instance.instance.id
-# }
-
-# resource "aws_connect_contact_flow" "test" {
-#   instance_id = "aaaaaaaa-bbbb-cccc-dddd-111111111111"
-#   name        = "Test"
-#   description = "Test Contact Flow Description"
-#   type        = "CONTACT_FLOW"
-#   content = jsonencode({
-#     Version     = "2019-10-30"
-#     StartAction = "12345678-1234-1234-1234-123456789012"
-#     Actions = [
-#       {
-#         Identifier = "12345678-1234-1234-1234-123456789012"
-#         Type       = "MessageParticipant"
-
-#         Transitions = {
-#           NextAction = "abcdef-abcd-abcd-abcd-abcdefghijkl"
-#           Errors     = []
-#           Conditions = []
-#         }
-
-#         Parameters = {
-#           Text = "Thanks for calling the sample flow!"
-#         }
-#       },
-#       {
-#         Identifier  = "abcdef-abcd-abcd-abcd-abcdefghijkl"
-#         Type        = "DisconnectParticipant"
-#         Transitions = {}
-#         Parameters  = {}
-#       }
-#     ]
-#   })
-
-#   tags = {
-#     "Name"        = "Test Contact Flow"
-#     "Application" = "Terraform"
-#     "Method"      = "Create"
-#   }
-# }
 
